@@ -1,43 +1,124 @@
-#include <Servo.h>
+/* RC_Bluetooth_2018_v6
+ * By:    Khamlek HOMSOMBATH
+ * Date:  Jan 17, 2018
+ * Download Controller for Android : https://play.google.com/store/apps/details?id=com.lekpkd.duinojoy
+ */
+ #include <Servo.h>
 
 Servo myservo;  // create servo object to control a servo
 // twelve servo objects can be created on most boards
 
 int pos = 0;    // variable to store the servo position
 
-char state = 0;            //Variable for storing received data
-int STBY = 2; //standby
+#include <SoftwareSerial.h>
 
-//Motor A
-int PWMA = 3; //Speed control
-int AI1 = 8; //Direction
-int AI2 = 7; //Direction
-
-//Motor B
-int PWMB = 5; //Speed control
-int BI1 = 12; //Direction
-int BI2 = 13; //Direction
+// arduino>>bluetooth
+// D10 (as RX)   >>>  Tx
+// D11 (as TX)  >>>  Rx
+SoftwareSerial bluetooth(0, 1); // RX, TX
+#define PWMA 3
+#define AIN2 7
+#define AIN1 8
+#define STBY 2
+#define BIN1 12
+#define BIN2 13
+#define PWMB 5
 
 void setup() {
+    myservo.attach(10);
+  Serial.begin(19200); 
+  bluetooth.begin(9600);
+  
+  pinMode(PWMA,OUTPUT); // PWM A
+  pinMode(PWMB,OUTPUT); // PWM B
+  pinMode(BIN1,OUTPUT); // B
+  pinMode(BIN2,OUTPUT); // B
+  pinMode(AIN1,OUTPUT); // A
+  pinMode(AIN2,OUTPUT); // A
+  pinMode(STBY,OUTPUT); // STBY
 
-  myservo.attach(10);  // attaches the servo on pin 9 to the servo object
-  Serial.begin(9600);
+  digitalWrite(STBY,1);
 
-while (!Serial);
+  analogWrite(PWMA, 0);
+  analogWrite(PWMB, 0);
+}
 
- pinMode(STBY, OUTPUT);
+String data = "";
+void loop() {
+  while(bluetooth.available()){
+    char a = bluetooth.read();
+    if(a==')') {
+      setData(data);
+      data = "";
+      return;
+    }
+    data += a;
+  }
+}
 
-pinMode(PWMA, OUTPUT);
-pinMode(AI1, OUTPUT);
-pinMode(AI2, OUTPUT);
-pinMode(PWMB, OUTPUT);
-pinMode(BI1, OUTPUT);
-pinMode(BI2, OUTPUT);
- Serial.begin(9600);
+int ledVal = 0;
+void setData(String data){
+  data.trim();
 
-while (!Serial);
+  int index = data.indexOf(",");
+  if(index != -1){
+    int angle = data.substring(0,index).toInt();
+    int strength = data.substring(index + 1).toInt();
 
-Serial.println("45 degree increments of movement for servo (A,B,C, D)");
+    digitalWrite(BIN1,0);
+    digitalWrite(BIN2,0);
+    digitalWrite(AIN1,0);
+    digitalWrite(AIN2,0);
+    if (angle < 180){
+      digitalWrite(BIN1,1);
+      digitalWrite(AIN1,1);
+
+      if(angle < 90){
+        analogWrite(PWMA, strength * 255 / 100);
+        analogWrite(PWMB, strength * (angle * 255 / 90) / 100);
+      }else if(angle > 90){
+        analogWrite(PWMA, strength * ((180 - angle) * 255 / 90) / 100);
+        analogWrite(PWMB, strength * 255 / 100);
+      }else{
+        analogWrite(PWMA, strength * 255 / 100);
+        analogWrite(PWMB, strength * 255 / 100);
+      }
+    }else if(angle > 180){
+      digitalWrite(BIN2,1);
+      digitalWrite(AIN2,1);
+      
+      if(angle > 270){
+        analogWrite(PWMA, strength * 255 / 100);
+        analogWrite(PWMB, strength * ((360 - angle) * 255 / 90) / 100);
+      }else if(angle < 270){
+        analogWrite(PWMA, strength * ((90 - (270 - angle)) * 255 / 90) / 100);
+        analogWrite(PWMB, strength * 255 / 100);
+      }else{
+        analogWrite(PWMA, strength * 255 / 100);
+        analogWrite(PWMB, strength * 255 / 100);
+      }
+    }
+    return;
+  }
+
+  if(data.equals("a")){
+   pos = 135;
+   myservo.write (pos);
+Serial.println("135");
+delay (20);
+  }
+  
+  if(data.equals("b")){
+   pos = 0;
+   myservo.write (pos);
+Serial.println("0");
+delay (20);
+  }
+  
+  
+  Serial.print("Recieved: ");
+  Serial.println(data);
+}
 Serial.println("/For motor A 1 = slow foward, 2 fast foward, 5, 6 same, 0 to stop");
 Serial.println("/For motor B 3 = slow foward, 4 fast foward, 7, 8 same, 9 to stop");
 }
